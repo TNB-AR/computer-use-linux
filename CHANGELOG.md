@@ -7,10 +7,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-15
+
+### Added
+- Generic X11/EWMH window backend so `list_windows`, `focused_window`,
+  `activate_window`, `move_window`, and `resize_window` work on X11 window
+  managers without a dedicated backend (Cinnamon/Muffin, MATE/Marco,
+  Xfce/xfwm4, Openbox, and others). (#41)
+- Pi coding agent extension package: `pi install npm:@agent-sh/computer-use-linux`
+  now provides Linux desktop control tools through `pi-mcp-adapter`'s MCP
+  proxy without a separate pi-specific skill. (#42)
+
+### Fixed
+- Hyprland 0.55 exact window focus: `activate_window` now tries the 0.55 Lua
+  focus dispatcher (`hl.dsp.focus`) first and falls back to the legacy
+  `focuswindow` dispatcher on older releases. (#45)
+- Exported MCP tool schemas no longer carry the non-standard `uint`/`uint8`/
+  `uint16`/`uint32`/`uint64`/`usize` `format` annotations emitted by
+  `schemars`, which produced repeated warnings in MCP clients; integer types
+  and numeric constraints are preserved. (#45)
+- GNOME extension package bootstrap on Ubuntu no longer tries to install the
+  nonexistent `gnome-shell-extension-tool` apt package; `gnome-shell` is
+  installed only when `gnome-extensions` is missing and apt can provide it. (#40)
+
+## [0.3.1] - 2026-07-03
+
+### Fixed
+- A scroll with a window target but no x/y/element_index focused the window and
+  then scrolled whatever sat under the cursor while reporting success.
+  Window-targeted scroll now defaults its point to the centre of the resolved
+  window (and errors with a pass-x/y hint when bounds are unavailable). Scroll
+  results also gain the same off-screen coordinate warning click already had.
+
+## [0.3.0] - 2026-07-03
+
 ### Added
 - Exposed a focused Rust library surface for downstream diagnostics,
   accessibility snapshots, screenshots, and server integration while preserving
-  the existing CLI binaries and standalone naming.
+  the existing CLI binaries and standalone naming. (#35)
+- Input-landing feedback: targeted keyboard input results append
+  focused-element feedback from AT-SPI and warn when no editable element holds
+  focus.
+- Off-screen detection: screenshot, click, and input results warn when the
+  target window or coordinate is partially or fully off-screen.
+- Window geometry tools: `move_window` and `resize_window` via the GNOME Shell
+  extension backend.
 
 ## [0.2.9] - 2026-06-22
 
@@ -286,7 +327,11 @@ pages; also bumps the MCP server's advertised version string to match.
 - Validated against GNOME 50.1 on Wayland (Ubuntu 25.10).
 - KDE / Sway / Hyprland untested — see README support matrix.
 
-[Unreleased]: https://github.com/agent-sh/computer-use-linux/compare/v0.2.8...HEAD
+[Unreleased]: https://github.com/agent-sh/computer-use-linux/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/agent-sh/computer-use-linux/compare/v0.3.1...v0.4.0
+[0.3.1]: https://github.com/agent-sh/computer-use-linux/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/agent-sh/computer-use-linux/compare/v0.2.9...v0.3.0
+[0.2.9]: https://github.com/agent-sh/computer-use-linux/compare/v0.2.8...v0.2.9
 [0.2.8]: https://github.com/agent-sh/computer-use-linux/compare/v0.2.7...v0.2.8
 [0.2.7]: https://github.com/agent-sh/computer-use-linux/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/agent-sh/computer-use-linux/compare/v0.2.5...v0.2.6
