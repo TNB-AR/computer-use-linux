@@ -295,14 +295,34 @@ impl ComputerUseLinux {
         let max_depth = params.max_depth.unwrap_or(12).min(12);
         let include_screenshot = params.include_screenshot.unwrap_or(true);
         let screenshot_options = params.screenshot_options();
+        let screenshot_target_requested = params.window_target().has_target();
         let app_filter = self
             .resolve_accessibility_app_filter(&params, window_context.as_ref())
             .await;
         let (screenshot, screenshot_error) = if include_screenshot {
-            match capture_screenshot_raw()
-                .await
-                .and_then(|raw| prepare_screenshot_payload(raw, screenshot_options))
-            {
+            let result = capture_screenshot_raw().await.and_then(|raw| {
+                if let Some(window) = window_context.as_ref() {
+                    let bounds = window.bounds.as_ref().ok_or_else(|| {
+                        anyhow::anyhow!(
+                            "targeted screenshot requires window bounds; refusing to return the full desktop"
+                        )
+                    })?;
+                    prepare_app_state_screenshot(
+                        raw,
+                        Some(bounds),
+                        screenshot_target_requested,
+                        screenshot_options,
+                    )
+                } else {
+                    prepare_app_state_screenshot(
+                        raw,
+                        None,
+                        screenshot_target_requested,
+                        screenshot_options,
+                    )
+                }
+            });
+            match result {
                 Ok(capture) => (Some(capture), None),
                 Err(error) => (None, Some(format!("{error:#}"))),
             }
@@ -1934,9 +1954,9 @@ struct ActionOutput {
 impl ComputerUseLinux {
     fn is_wayland_session(&self) -> bool {
         crate::diagnostics::hydrate_session_bus_env();
-        env::var("XDG_SESSION_TYPE")
-            .ok()
-            .is_some_and(|value| value.eq_ignore_ascii_case("wayland"))
+        let session_type = env::var("XDG_SESSION_TYPE").ok();
+        let wayland_display = env::var("WAYLAND_DISPLAY").ok();
+        session_is_wayland(session_type.as_deref(), wayland_display.as_deref())
     }
 
     // The Wayland remote-desktop portal is now a *fallback* for input: when a
@@ -2975,6 +2995,56 @@ fn data_url_payload(data_url: &str) -> String {
         .to_string()
 }
 
+fn session_is_wayland(session_type: Option<&str>, wayland_display: Option<&str>) -> bool {
+    match session_type {
+        Some(value) => value.eq_ignore_ascii_case("wayland"),
+        None => wayland_display.is_some_and(|value| !value.is_empty()),
+    }
+}
+
+fn prepare_app_state_screenshot(
+    mut raw: RawScreenshotCapture,
+    bounds: Option<&crate::windowing::WindowBounds>,
+    target_requested: bool,
+    options: ScreenshotPayloadOptions,
+) -> Result<ScreenshotCapture> {
+    if target_requested && bounds.is_none() {
+        anyhow::bail!(
+            "targeted screenshot requires a resolved window; refusing to return the full desktop"
+        );
+    }
+    if let Some(bounds) = bounds {
+        let (mut x, mut y, mut width, mut height) = window_crop_rect(bounds).ok_or_else(|| {
+            anyhow::anyhow!(
+                "targeted screenshot has unusable window bounds; refusing to return the full desktop"
+            )
+        })?;
+        if x < 0 {
+            width = width.saturating_sub(x.unsigned_abs());
+            x = 0;
+        }
+        if y < 0 {
+            height = height.saturating_sub(y.unsigned_abs());
+            y = 0;
+        }
+        if width == 0 || height == 0 {
+            anyhow::bail!(
+                "targeted screenshot window is outside the captured desktop; refusing to return the full desktop"
+            );
+        }
+        let (bytes, width, height) = crop_png(&raw.bytes, x, y, width, height)
+            .map_err(|error| anyhow::anyhow!("targeted screenshot crop failed: {error}"))?;
+        raw = RawScreenshotCapture {
+            mime_type: raw.mime_type,
+            bytes,
+            source: raw.source,
+            width,
+            height,
+        };
+    }
+    prepare_screenshot_payload(raw, options)
+}
+
 /// Convert a window's bounds into a crop rectangle, if it has a usable origin
 /// and non-zero size.
 fn window_crop_rect(bounds: &crate::windowing::WindowBounds) -> Option<(i32, i32, u32, u32)> {
@@ -3874,6 +3944,95 @@ mod tests {
             .write_to(&mut std::io::Cursor::new(&mut out), image::ImageFormat::Png)
             .unwrap();
         out
+    }
+
+    #[test]
+    fn targeted_app_state_crops_before_screenshot_payload_resize() {
+        let raw = RawScreenshotCapture {
+            mime_type: "image/png".to_string(),
+            bytes: solid_png(400, 200),
+            source: "test".to_string(),
+            width: 400,
+            height: 200,
+        };
+        let bounds = WindowBounds {
+            x: Some(50),
+            y: Some(20),
+            width: 200,
+            height: 100,
+        };
+        let capture = prepare_app_state_screenshot(
+            raw,
+            Some(&bounds),
+            true,
+            ScreenshotPayloadOptions {
+                max_width: Some(100),
+                max_height: Some(100),
+                max_bytes: Some(1024 * 1024),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+
+        assert_eq!(
+            (capture.coordinate_width, capture.coordinate_height),
+            (200, 100)
+        );
+        assert_eq!((capture.width, capture.height), (100, 50));
+    }
+
+    #[test]
+    fn unresolved_app_state_target_refuses_full_desktop_screenshot() {
+        let raw = RawScreenshotCapture {
+            mime_type: "image/png".to_string(),
+            bytes: solid_png(400, 200),
+            source: "test".to_string(),
+            width: 400,
+            height: 200,
+        };
+
+        let error =
+            prepare_app_state_screenshot(raw, None, true, ScreenshotPayloadOptions::default())
+                .unwrap_err();
+
+        assert!(error.to_string().contains("requires a resolved window"));
+    }
+
+    #[test]
+    fn targeted_app_state_crops_only_visible_part_of_offscreen_window() {
+        let raw = RawScreenshotCapture {
+            mime_type: "image/png".to_string(),
+            bytes: solid_png(400, 200),
+            source: "test".to_string(),
+            width: 400,
+            height: 200,
+        };
+        let bounds = WindowBounds {
+            x: Some(-50),
+            y: Some(-40),
+            width: 100,
+            height: 100,
+        };
+
+        let capture = prepare_app_state_screenshot(
+            raw,
+            Some(&bounds),
+            true,
+            ScreenshotPayloadOptions::default(),
+        )
+        .unwrap();
+
+        assert_eq!(
+            (capture.coordinate_width, capture.coordinate_height),
+            (50, 60)
+        );
+    }
+
+    #[test]
+    fn wayland_display_is_enough_to_select_portal_fallback() {
+        assert!(session_is_wayland(None, Some("wayland-1")));
+        assert!(session_is_wayland(Some("wayland"), None));
+        assert!(!session_is_wayland(Some("x11"), None));
     }
 
     #[test]
