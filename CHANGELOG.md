@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-07-15
+
+### Fixed
+- Targeted `get_app_state` screenshots now crop to the resolved target window,
+  and refuse the full-desktop fallback when a target was requested but window
+  bounds cannot be resolved or the window is entirely off-screen. (#48)
+- Hyprland window bounds are normalized against each window's monitor origin
+  and fractional scale so portal screenshot coordinates align on
+  multi-monitor and scaled (e.g. 1.8x/2.0x) setups. (#48)
+- Wayland sessions are recognized via `WAYLAND_DISPLAY` when
+  `XDG_SESSION_TYPE` is unavailable, so the portal input fallback engages in
+  environments that don't export the session type. (#48)
+- Window focus verification now allows up to one second for compositor
+  workspace/focus transitions before reporting activation failure. (#48)
+
 ## [0.4.0] - 2026-07-15
 
 ### Added
@@ -327,7 +342,8 @@ pages; also bumps the MCP server's advertised version string to match.
 - Validated against GNOME 50.1 on Wayland (Ubuntu 25.10).
 - KDE / Sway / Hyprland untested — see README support matrix.
 
-[Unreleased]: https://github.com/agent-sh/computer-use-linux/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/agent-sh/computer-use-linux/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/agent-sh/computer-use-linux/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/agent-sh/computer-use-linux/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/agent-sh/computer-use-linux/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/agent-sh/computer-use-linux/compare/v0.2.9...v0.3.0
