@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.2] - 2026-07-25
+
 ### Fixed
 - X11 keyboard input now goes through `xdotool` (XTEST) instead of ydotool.
   ydotool injects raw evdev scancodes into a virtual uinput device, which X11
@@ -358,7 +360,8 @@ pages; also bumps the MCP server's advertised version string to match.
 - Validated against GNOME 50.1 on Wayland (Ubuntu 25.10).
 - KDE / Sway / Hyprland untested — see README support matrix.
 
-[Unreleased]: https://github.com/agent-sh/computer-use-linux/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/agent-sh/computer-use-linux/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/agent-sh/computer-use-linux/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/agent-sh/computer-use-linux/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/agent-sh/computer-use-linux/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/agent-sh/computer-use-linux/compare/v0.3.0...v0.3.1
