@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.5] - 2026-08-01
+
+### Fixed
+- Stateful ydotool operations now complete while retaining the serialized input
+  lock after caller cancellation, preventing paired button or key events from
+  being interrupted. Drag also attempts button release after intermediate
+  failures.
+- Scaled KWin sessions now map logical window geometry through the compositor's
+  virtual screen geometry while preserving logical portal input coordinates.
+- Hyprland window bounds now map against grim's complete global output union,
+  including negative origins and mixed or fractional scales, and are omitted
+  when monitor metadata is unavailable or invalid.
+- Mirrored KScreen outputs are excluded from the portal monitor layout.
+
 ## [0.4.4] - 2026-07-31
 
 ### Fixed
@@ -383,7 +397,8 @@ pages; also bumps the MCP server's advertised version string to match.
 - Validated against GNOME 50.1 on Wayland (Ubuntu 25.10).
 - KDE / Sway / Hyprland untested — see README support matrix.
 
-[Unreleased]: https://github.com/agent-sh/computer-use-linux/compare/v0.4.4...HEAD
+[Unreleased]: https://github.com/agent-sh/computer-use-linux/compare/v0.4.5...HEAD
+[0.4.5]: https://github.com/agent-sh/computer-use-linux/compare/v0.4.4...v0.4.5
 [0.4.4]: https://github.com/agent-sh/computer-use-linux/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/agent-sh/computer-use-linux/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/agent-sh/computer-use-linux/compare/v0.4.1...v0.4.2
