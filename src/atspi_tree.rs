@@ -102,6 +102,24 @@ pub enum ValueSetInvocation {
 
 const MAX_TEXT_READBACK_CHARS: i32 = 4096;
 const MAX_TEXT_SELECTIONS: i32 = 8;
+const DEFAULT_SNAPSHOT_MAX_NODES: usize = 1_000;
+const HARD_SNAPSHOT_MAX_NODES: usize = 2_000;
+const DEFAULT_SNAPSHOT_MAX_DEPTH: u32 = 32;
+const HARD_SNAPSHOT_MAX_DEPTH: u32 = 64;
+
+pub(crate) fn snapshot_limits(
+    requested_max_nodes: Option<usize>,
+    requested_max_depth: Option<u32>,
+) -> (usize, u32) {
+    (
+        requested_max_nodes
+            .unwrap_or(DEFAULT_SNAPSHOT_MAX_NODES)
+            .clamp(1, HARD_SNAPSHOT_MAX_NODES),
+        requested_max_depth
+            .unwrap_or(DEFAULT_SNAPSHOT_MAX_DEPTH)
+            .min(HARD_SNAPSHOT_MAX_DEPTH),
+    )
+}
 
 pub async fn list_accessible_apps(limit: usize) -> Result<Vec<AccessibleAppSummary>> {
     let conn = connect().await?;
@@ -747,5 +765,18 @@ mod tests {
         let labels = state_labels(StateSet::new(atspi::State::Focused | atspi::State::Checked));
 
         assert_eq!(labels, vec!["checked".to_string(), "focused".to_string()]);
+    }
+
+    #[test]
+    fn default_snapshot_limits_cover_deep_gtk4_trees() {
+        // Nautilus 50 places file-list cells below depth 20 and can expose
+        // more than 850 raw nodes. Keep the defaults above that known shape.
+        assert_eq!(snapshot_limits(None, None), (1_000, 32));
+    }
+
+    #[test]
+    fn requested_snapshot_limits_remain_bounded() {
+        assert_eq!(snapshot_limits(Some(0), Some(0)), (1, 0));
+        assert_eq!(snapshot_limits(Some(10_000), Some(128)), (2_000, 64));
     }
 }
