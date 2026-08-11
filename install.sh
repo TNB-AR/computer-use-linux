@@ -591,6 +591,15 @@ install_gnome_extension() {
 # Step 8: doctor readiness check
 # -----------------------------------------------------------------------------
 
+doctor_install_prerequisites_ready_raw() {
+    local out="$1" field
+    for field in can_register_mcp_tools can_build_accessibility_tree can_send_development_input; do
+        if ! printf '%s' "${out}" | grep -qE "\"${field}\"[[:space:]]*:[[:space:]]*true([[:space:],}]|$)"; then
+            return 1
+        fi
+    done
+}
+
 run_doctor() {
     log_section "Step 8/9 — doctor readiness"
     if [[ ${SKIP_DOCTOR} -eq 1 ]]; then log_skip "--skip-doctor"; return 0; fi
@@ -605,30 +614,59 @@ run_doctor() {
     fi
 
     if command -v jq >/dev/null 2>&1 && printf '%s' "${out}" | jq -e . >/dev/null 2>&1; then
-        local blockers
+        local blockers readiness_status
         blockers="$(printf '%s' "${out}" | jq -r '.readiness.blockers | if type == "array" then length else -1 end')"
+        readiness_status="$(printf '%s' "${out}" | jq -r '
+            .readiness as $r |
+            if ($r | type) != "object"
+                or ($r.blockers | type) != "array"
+                or ($r.can_register_mcp_tools | type) != "boolean"
+                or ($r.can_build_accessibility_tree | type) != "boolean"
+                or ($r.can_send_development_input | type) != "boolean"
+            then "invalid"
+            elif $r.can_register_mcp_tools != true
+                or $r.can_build_accessibility_tree != true
+                or $r.can_send_development_input != true
+            then "blocked"
+            elif ($r.blockers | length) == 0 then "ready"
+            else "degraded"
+            end
+        ')"
         printf '%s\n' "${out}" | jq -r '
             .readiness as $r |
-            "ready: \($r.blockers | type == "array" and length == 0)\n" +
+            "fully ready: \($r.blockers | type == "array" and length == 0)\n" +
             ((($r.blockers // []) | map("  - \(.)") | join("\n")))
         '
-        if [[ "${blockers}" -eq 0 ]]; then
-            log_ok "doctor reports ready"
-        elif [[ "${blockers}" -eq -1 ]]; then
-            log_fail "doctor output missing blockers field — unexpected JSON structure"
-            return 1
-        else
-            log_fail "doctor reports NOT ready"
-            while IFS= read -r line; do
-                FAILED_CHECKS+=("${line}")
-            done < <(printf '%s' "${out}" | jq -r '.readiness.blockers[]?')
-            return 1
-        fi
+        case "${readiness_status}" in
+            ready)
+                log_ok "doctor reports ready"
+                ;;
+            degraded)
+                local capability_verb="capabilities are"
+                if [[ "${blockers}" -eq 1 ]]; then capability_verb="capability is"; fi
+                log_ok "installation prerequisites are ready"
+                log_warn "installation succeeded; ${blockers} platform ${capability_verb} unavailable on this desktop/compositor"
+                ;;
+            blocked)
+                log_fail "doctor reports NOT ready"
+                while IFS= read -r line; do
+                    FAILED_CHECKS+=("${line}")
+                done < <(printf '%s' "${out}" | jq -r '.readiness.blockers[]?')
+                return 1
+                ;;
+            *)
+                log_fail "doctor output is missing required readiness fields — unexpected JSON structure"
+                return 1
+                ;;
+        esac
     else
         # Raw fallback.
         printf '%s\n' "${out}"
         if printf '%s' "${out}" | grep -qiE '"blockers"[[:space:]]*:[[:space:]]*\[\]'; then
             log_ok "doctor reports ready (raw)"
+        elif doctor_install_prerequisites_ready_raw "${out}"; then
+            log_ok "installation prerequisites are ready (raw)"
+            log_warn "installation succeeded; platform capabilities are unavailable on this desktop/compositor"
         else
             log_fail "doctor did not report ready (install jq for a structured summary)"
             return 1
