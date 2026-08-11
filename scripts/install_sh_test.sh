@@ -30,6 +30,33 @@ assert_not_contains() {
     fi
 }
 
+create_fake_doctor() {
+    local path="$1"
+    printf '%s\n' \
+        '#!/usr/bin/env bash' \
+        'printf '\''%s\n'\'' "${COMPUTER_USE_LINUX_TEST_DOCTOR_OUTPUT}"' \
+        >"${path}"
+    chmod +x "${path}"
+}
+
+run_fake_doctor() {
+    local doctor_output="$1" hide_jq="${2:-0}" fake_dir status
+    fake_dir="$(mktemp -d)"
+    INSTALL_PATH="${fake_dir}/computer-use-linux"
+    create_fake_doctor "${INSTALL_PATH}"
+    export COMPUTER_USE_LINUX_TEST_DOCTOR_OUTPUT="${doctor_output}"
+    if [[ "${hide_jq}" -eq 1 ]]; then
+        command() {
+            if [[ "$1" == "-v" && "$2" == "jq" ]]; then return 1; fi
+            builtin command "$@"
+        }
+    fi
+    status=0
+    run_doctor || status=$?
+    rm -rf -- "${fake_dir}"
+    return "${status}"
+}
+
 test_artix_selects_pacman() (
     export COMPUTER_USE_LINUX_OS_RELEASE_FILE="${FIXTURE_DIR}/os-release.artix"
     export XDG_SESSION_TYPE=x11
@@ -171,6 +198,62 @@ test_non_systemd_host_requires_uinput_access() (
     assert_not_contains "${output}" "configure your per-user supervisor to run" || return 1
 )
 
+test_doctor_accepts_platform_capability_blockers() (
+    # shellcheck source=../install.sh
+    source "${INSTALLER}"
+    local status output doctor_output
+    doctor_output='{"readiness":{"can_register_mcp_tools":true,"can_build_accessibility_tree":true,"can_query_windows":false,"can_focus_apps":false,"can_focus_windows":false,"can_send_development_input":true,"recommended_next_step":"Use global input without targeted window focus.","blockers":["Window introspection is unavailable; targeted window focus and verification will be disabled."]}}'
+
+    status=0
+    output="$(run_fake_doctor "${doctor_output}")" || status=$?
+
+    assert_eq "${status}" "0" || return 1
+    assert_contains "${output}" "installation succeeded; 1 platform capability is unavailable" || return 1
+    assert_contains "${output}" "Window introspection is unavailable" || return 1
+    assert_not_contains "${output}" "doctor reports NOT ready" || return 1
+)
+
+test_doctor_rejects_missing_install_prerequisite() (
+    # shellcheck source=../install.sh
+    source "${INSTALLER}"
+    local status output doctor_output
+    doctor_output='{"readiness":{"can_register_mcp_tools":true,"can_build_accessibility_tree":true,"can_query_windows":false,"can_focus_apps":false,"can_focus_windows":false,"can_send_development_input":false,"recommended_next_step":"Start a keyboard-capable input backend.","blockers":["Window introspection is unavailable.","Development keyboard input is unavailable."]}}'
+
+    status=0
+    output="$(run_fake_doctor "${doctor_output}")" || status=$?
+
+    assert_eq "${status}" "1" || return 1
+    assert_contains "${output}" "doctor reports NOT ready" || return 1
+    assert_contains "${output}" "Development keyboard input is unavailable" || return 1
+)
+
+test_doctor_raw_fallback_accepts_platform_capability_blockers() (
+    # shellcheck source=../install.sh
+    source "${INSTALLER}"
+    local status output doctor_output
+    doctor_output='{"readiness":{"can_register_mcp_tools":true,"can_build_accessibility_tree":true,"can_query_windows":false,"can_focus_apps":false,"can_focus_windows":false,"can_send_development_input":true,"recommended_next_step":"Use global input without targeted window focus.","blockers":["Window introspection is unavailable."]}}'
+
+    status=0
+    output="$(run_fake_doctor "${doctor_output}" 1)" || status=$?
+
+    assert_eq "${status}" "0" || return 1
+    assert_contains "${output}" "installation succeeded; platform capabilities are unavailable" || return 1
+    assert_not_contains "${output}" "doctor did not report ready" || return 1
+)
+
+test_doctor_raw_fallback_rejects_missing_install_prerequisite() (
+    # shellcheck source=../install.sh
+    source "${INSTALLER}"
+    local status output doctor_output
+    doctor_output='{"readiness":{"can_register_mcp_tools":true,"can_build_accessibility_tree":true,"can_query_windows":false,"can_focus_apps":false,"can_focus_windows":false,"can_send_development_input":false,"recommended_next_step":"Start a keyboard-capable input backend.","blockers":["Development keyboard input is unavailable."]}}'
+
+    status=0
+    output="$(run_fake_doctor "${doctor_output}" 1)" || status=$?
+
+    assert_eq "${status}" "1" || return 1
+    assert_contains "${output}" "doctor did not report ready" || return 1
+)
+
 run_test() {
     local name="$1" test_fn="$2"
     if "${test_fn}"; then
@@ -189,3 +272,7 @@ run_test "startx system dependencies include xdotool" test_startx_system_deps_in
 run_test "Wayland system dependencies exclude xdotool" test_wayland_system_deps_exclude_xdotool
 run_test "non-systemd host gets manual ydotoold guidance" test_non_systemd_host_gets_manual_guidance
 run_test "non-systemd host requires uinput access" test_non_systemd_host_requires_uinput_access
+run_test "doctor accepts platform capability blockers" test_doctor_accepts_platform_capability_blockers
+run_test "doctor rejects missing install prerequisites" test_doctor_rejects_missing_install_prerequisite
+run_test "doctor raw fallback accepts platform capability blockers" test_doctor_raw_fallback_accepts_platform_capability_blockers
+run_test "doctor raw fallback rejects missing install prerequisites" test_doctor_raw_fallback_rejects_missing_install_prerequisite
