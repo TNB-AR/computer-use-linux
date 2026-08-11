@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.9] - 2026-08-12
+
 ### Fixed
 - Bounded AT-SPI traversals now use concurrent indexed child reads, count both
   queued references and failed child lookups against their work budgets, and
@@ -435,7 +437,8 @@ pages; also bumps the MCP server's advertised version string to match.
 - Validated against GNOME 50.1 on Wayland (Ubuntu 25.10).
 - KDE / Sway / Hyprland untested — see README support matrix.
 
-[Unreleased]: https://github.com/agent-sh/computer-use-linux/compare/v0.4.8...HEAD
+[Unreleased]: https://github.com/agent-sh/computer-use-linux/compare/v0.4.9...HEAD
+[0.4.9]: https://github.com/agent-sh/computer-use-linux/compare/v0.4.8...v0.4.9
 [0.4.8]: https://github.com/agent-sh/computer-use-linux/compare/v0.4.7...v0.4.8
 [0.4.7]: https://github.com/agent-sh/computer-use-linux/compare/v0.4.6...v0.4.7
 [0.4.6]: https://github.com/agent-sh/computer-use-linux/compare/v0.4.5...v0.4.6
