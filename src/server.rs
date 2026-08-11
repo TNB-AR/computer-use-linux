@@ -302,8 +302,8 @@ impl ComputerUseLinux {
             .expect("diagnostics task panicked");
         let (window_context, window_error, window_permissions_hint) =
             self.resolve_window_context(&params).await;
-        let max_nodes = params.max_nodes.unwrap_or(120).clamp(1, 500);
-        let max_depth = params.max_depth.unwrap_or(12).min(12);
+        let (max_nodes, max_depth) =
+            crate::atspi_tree::snapshot_limits(params.max_nodes, params.max_depth);
         let include_screenshot = params.include_screenshot.unwrap_or(true);
         let screenshot_options = params.screenshot_options();
         let screenshot_target_requested = params.window_target().has_target();
@@ -1845,8 +1845,10 @@ struct GetAppStateParams {
     wm_class: Option<String>,
     #[serde(default)]
     title: Option<String>,
+    /// Maximum raw AT-SPI nodes to inspect before compaction (default 1000, hard max 2000).
     #[serde(default)]
     max_nodes: Option<usize>,
+    /// Maximum AT-SPI traversal depth (default 32, hard max 64).
     #[serde(default)]
     max_depth: Option<u32>,
     #[serde(default)]
