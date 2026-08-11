@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Bounded AT-SPI traversals now use concurrent indexed child reads, count both
+  queued references and failed child lookups against their work budgets, and
+  enforce a snapshot deadline so wide, malformed, or stalled accessibility
+  trees cannot allocate or retain unbounded work.
+
 ## [0.4.8] - 2026-08-12
 
 ### Fixed
