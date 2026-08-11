@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.8] - 2026-08-12
+
+### Fixed
+- AT-SPI state capture now reaches deeply nested GTK4 controls such as Nautilus
+  file cells by using a 1,000-node default budget and depth-32 traversal, with
+  bounded 2,000-node and depth-64 limits shared by the MCP and CLI paths.
+- `install.sh` now treats unavailable window-targeting or exact-focus support as
+  a degraded platform capability when MCP registration, accessibility trees,
+  and development input are ready, while missing core prerequisites remain hard
+  failures. The same classification applies when `jq` is unavailable.
+
 ## [0.4.7] - 2026-08-09
 
 ### Fixed
@@ -418,7 +429,8 @@ pages; also bumps the MCP server's advertised version string to match.
 - Validated against GNOME 50.1 on Wayland (Ubuntu 25.10).
 - KDE / Sway / Hyprland untested — see README support matrix.
 
-[Unreleased]: https://github.com/agent-sh/computer-use-linux/compare/v0.4.7...HEAD
+[Unreleased]: https://github.com/agent-sh/computer-use-linux/compare/v0.4.8...HEAD
+[0.4.8]: https://github.com/agent-sh/computer-use-linux/compare/v0.4.7...v0.4.8
 [0.4.7]: https://github.com/agent-sh/computer-use-linux/compare/v0.4.6...v0.4.7
 [0.4.6]: https://github.com/agent-sh/computer-use-linux/compare/v0.4.5...v0.4.6
 [0.4.5]: https://github.com/agent-sh/computer-use-linux/compare/v0.4.4...v0.4.5
